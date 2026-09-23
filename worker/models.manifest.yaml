@@ -1,0 +1,98 @@
+# 要預先放進 GPUtw /vault/models 的模型（映像裡不放模型）。
+# 用 download-model-to-vault（伺服器端下載，不佔 GPU 時數），dest 相對於 /vault/models。
+# 大小取自 Hugging Face API（2026-09-23）；/vault 依容量計費，先只下 profile: poc 的項目。
+#
+# profile:
+#   poc   S1 可行性 PoC 最少需要的（草稿 + 配音）
+#   full  完整管線（精修、口型、音效、補幀、超解析）
+
+hf_repos:
+  wan: &wan Comfy-Org/Wan_2.2_ComfyUI_Repackaged
+
+models:
+  # ── 影片生成（Wan2.2）─────────────────────────────────────────────
+  - id: wan22_ti2v_5b
+    source: {hf: *wan, file: split_files/diffusion_models/wan2.2_ti2v_5B_fp16.safetensors}
+    dest: diffusion_models/
+    size_gb: 10.00
+    profile: poc
+  - id: wan22_vae
+    source: {hf: *wan, file: split_files/vae/wan2.2_vae.safetensors}
+    dest: vae/
+    size_gb: 1.41
+    profile: poc
+  - id: umt5_xxl_fp8
+    source: {hf: *wan, file: split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors}
+    dest: text_encoders/
+    size_gb: 6.74
+    profile: poc
+  - id: wan22_i2v_a14b_high_fp8
+    source: {hf: *wan, file: split_files/diffusion_models/wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors}
+    dest: diffusion_models/
+    size_gb: 14.29
+    profile: full
+  - id: wan22_i2v_a14b_low_fp8
+    source: {hf: *wan, file: split_files/diffusion_models/wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors}
+    dest: diffusion_models/
+    size_gb: 14.29
+    profile: full
+  - id: wan21_vae  # A14B 用 2.1 的 VAE
+    source: {hf: *wan, file: split_files/vae/wan_2.1_vae.safetensors}
+    dest: vae/
+    size_gb: 0.25
+    profile: full
+
+  # ── 配音（CosyVoice3）；整個 repo 下載，推論只需 llm.rl.pt 或 llm.pt 其一 ──
+  - id: cosyvoice3
+    source: {hf: FunAudioLLM/Fun-CosyVoice3-0.5B-2512}
+    dest: cosyvoice/Fun-CosyVoice3-0.5B/
+    size_gb: 9.8
+    profile: poc
+
+  # ── 口型同步（LatentSync 1.6）；auxiliary/ 是訓練評估用，不下載 ──────────
+  - id: latentsync_unet
+    source: {hf: ByteDance/LatentSync-1.6, file: latentsync_unet.pt}
+    dest: latentsync/
+    size_gb: 5.07
+    profile: full
+  - id: latentsync_whisper
+    source: {hf: ByteDance/LatentSync-1.6, file: whisper/tiny.pt}
+    dest: latentsync/whisper/
+    size_gb: 0.08
+    profile: full
+
+  # ── 環境音效（MMAudio，fp16）─────────────────────────────────────────
+  - id: mmaudio_large
+    source: {hf: Kijai/MMAudio_safetensors, file: mmaudio_large_44k_v2_fp16.safetensors}
+    dest: mmaudio/
+    size_gb: 2.06
+    profile: full
+  - id: mmaudio_vae
+    source: {hf: Kijai/MMAudio_safetensors, file: mmaudio_vae_44k_fp16.safetensors}
+    dest: mmaudio/
+    size_gb: 0.61
+    profile: full
+  - id: mmaudio_synchformer
+    source: {hf: Kijai/MMAudio_safetensors, file: mmaudio_synchformer_fp16.safetensors}
+    dest: mmaudio/
+    size_gb: 0.47
+    profile: full
+  - id: mmaudio_clip
+    source: {hf: Kijai/MMAudio_safetensors, file: apple_DFN5B-CLIP-ViT-H-14-384_fp16.safetensors}
+    dest: mmaudio/
+    size_gb: 1.97
+    profile: full
+
+  # ── 補幀 / 超解析（小檔，GitHub releases）─────────────────────────────
+  - id: rife47
+    source: {url: https://github.com/Fannovel16/ComfyUI-Frame-Interpolation/releases/download/models/rife47.pth}
+    dest: vfi/rife/
+    size_gb: 0.02
+    profile: full
+  - id: realesrgan_x2
+    source: {url: https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.1/RealESRGAN_x2plus.pth}
+    dest: upscale_models/
+    size_gb: 0.07
+    profile: full
+
+# 合計：poc ≈ 28 GB；poc + full ≈ 67 GB（另加 LoRA 與專案輸出）

@@ -1,0 +1,22 @@
+# 本機資料與機密
+data/
+.env
+.env.*
+.claude/
+.serena/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Node
+node_modules/
+frontend/dist/
+
+# 編輯器
+.vscode/
+.idea/
+*.swp
+.DS_Store

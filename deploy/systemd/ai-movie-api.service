@@ -1,0 +1,16 @@
+# 使用者層級服務：cp 到 ~/.config/systemd/user/ 後
+#   systemctl --user daemon-reload && systemctl --user enable --now ai-movie-api
+# 前端先 `cd frontend && npm run build`，API 會直接提供 frontend/dist。
+[Unit]
+Description=ai-movie 控制平面（FastAPI :8110）
+After=network-online.target
+
+[Service]
+WorkingDirectory=%h/project/ai-movie/backend
+ExecStart=%h/.local/bin/uv run --frozen --no-dev uvicorn app.main:app --host 127.0.0.1 --port 8110
+Restart=on-failure
+RestartSec=3
+MemoryMax=1G
+
+[Install]
+WantedBy=default.target
