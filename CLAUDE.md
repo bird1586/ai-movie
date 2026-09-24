@@ -60,7 +60,13 @@ PoC 實測紀錄與優化清單：`docs/PoC紀錄.md`（**動 GPU 之前先讀�
   一次開機跑 N 個 5 秒鏡頭 ≈ 冷載入 + N × 170 s。
 - **提示詞（Wan2.2 5B）**：鏡頭運動要寫在**提示詞最前面**（"The camera pans…"、"Tracking shot…"、"Slow motion, the camera orbits…"），
   寫在中間幾乎沒作用。負面提示詞**不要**放「镜头抖动」等鏡頭相關詞，會把整個運鏡壓掉（第 2 次 PoC 就是這樣變成靜態畫面）。
-  每個鏡頭給 2 個 seed，看聯絡表（contact sheet）挑一個。
+  新鏡頭第一次試拍給 2 個 seed，看聯絡表（contact sheet）挑一個，**把選中的 seed 移到 `seeds` 第一個**；
+  之後重跑一律加 `--max-seeds 1`（費用減半）。
+- **多鏡頭接成一段**用 `--chain`：整串變成一個 ComfyUI 工作流，後一鏡用前一鏡最後一格當 `start_image`
+  （`ImageFromBatch` → `Wan22ImageToVideoLatent.start_image`），本機再用 ffmpeg 去掉重複的那一格接成一支影片。
+  後一鏡的提示詞要**從前一鏡最後的畫面寫起**（例：`shots/xianxia_flight_cont.json`）。
+- `run_poc.py` 一開始就把全部工作送進 ComfyUI 佇列，GPU 算下一支時本機同時下載上一支。
+  `--check` 只在本機組工作流、不連線，改完鏡頭規格先跑這個。
 - 單價的 `hourlyRate` 是**美元**（0.5994 ≈ NT$18.9/h），帳戶餘額是新台幣（`get-vault-stats` 的 `balanceNtd`）。
 - `/vault` 每月 NT$2/GB。模型用 `download-model-to-vault`（`hf:owner/repo:path` 或 URL）在伺服器端下載，
   不用開 GPU。

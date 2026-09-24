@@ -28,6 +28,10 @@ vae/wan2.2_vae.safetensors                             1.41 GB
 > python gputw_session.py shots/xianxia_clash.json shots/xianxia_flight.json   # 會先報機器與費率，問 y/N
 > ```
 > 自動挑機 → 開機 → 拿 Web UI cookie → 本機跑 `run_poc.py`（多個鏡頭同一次開機）→ 影片下載到 `data/poc/` → 一定 stop。
+> - `--max-seeds 1`：每個鏡頭只跑 `seeds` 的第一個（選好的 seed 放第一個）。
+> - `--chain`：後一鏡從前一鏡最後一格接下去，接點不跳，並自動接成 `<id1>+<id2>_s<seed>.mp4`：
+>   `python gputw_session.py shots/xianxia_clash.json shots/xianxia_flight_cont.json --chain --max-seeds 1`
+> - 所有工作一開始就送進佇列，GPU 不等下載。先用 `python run_poc.py … --check` 在本機看會跑幾次生成。
 > 手動版：`create-instance`（ComfyUI 範本）→ `POST /instances/{id}/access-token {"port":8080}` 換 cookie →
 > `COMFY_COOKIE=… RATE_NT_PER_H=<實際費率> python run_poc.py shots/a.json shots/b.json --comfy https://8080-<id>.gputw.ai --output-dir ../../data` → stop。
 

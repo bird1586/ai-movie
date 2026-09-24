@@ -3,6 +3,7 @@
 
 只用標準函式庫，在本機（不是 GPU 機器）執行：
     python gputw_session.py shots/xianxia_clash.json shots/xianxia_flight.json
+    python gputw_session.py shots/xianxia_clash.json shots/xianxia_flight_cont.json --chain --max-seeds 1
 模型要先在 /vault/models/<類別>/（見 README.md）。API key 讀 ~/.config/gputw/key（權限 600），
 這支程式不會印出 key。
 """
@@ -97,12 +98,14 @@ def main() -> None:
     ap.add_argument("--max-usd", type=float, default=0.8, help="每小時上限（美元）")
     ap.add_argument("--boot-timeout", type=float, default=900, help="開機停損秒數")
     ap.add_argument("--output-dir", type=Path, default=HERE.parents[1] / "data")
+    ap.add_argument("--max-seeds", type=int, help="傳給 run_poc.py：每個鏡頭只跑前 N 個 seed")
+    ap.add_argument("--chain", action="store_true", help="傳給 run_poc.py：鏡頭接成一段，後一鏡從前一鏡最後一格開始")
     ap.add_argument("--yes", action="store_true", help="不再確認直接開機（使用者已同意這次花費）")
     args = ap.parse_args()
 
-    for p in args.shots:  # 開機前先在本機驗鏡頭規格，錯了就不花錢
-        subprocess.run([sys.executable, "-c", f"import json,sys; sys.path.insert(0,{str(HERE)!r}); import run_poc; "
-                        f"run_poc.build_prompt(json.load(open({str(p)!r})), 0)"], check=True)
+    passthrough = [*(["--max-seeds", str(args.max_seeds)] if args.max_seeds else []), *(["--chain"] if args.chain else [])]
+    # 開機前先在本機組好全部工作流、驗鏡頭規格，錯了就不花錢
+    subprocess.run([sys.executable, str(HERE / "run_poc.py"), *map(str, args.shots), *passthrough, "--check"], check=True)
 
     node = pick_node(args.gpu or ["RTX 4090", "RTX 5090"], args.max_usd)
     tmpl = comfy_template()
@@ -127,7 +130,7 @@ def main() -> None:
         env = os.environ | {"COMFY_COOKIE": web_cookie(iid, port), "RATE_NT_PER_H": f"{rate_nt:.2f}"}
         t1 = time.monotonic()
         subprocess.run([sys.executable, "-u", str(HERE / "run_poc.py"), *map(str, args.shots),
-                        "--comfy", f"https://{port}-{iid}.gputw.ai", "--output-dir", str(args.output_dir)],
+                        *passthrough, "--comfy", f"https://{port}-{iid}.gputw.ai", "--output-dir", str(args.output_dir)],
                        env=env, check=True)
         session["generate_s"] = round(time.monotonic() - t1, 1)
     finally:

@@ -5,8 +5,8 @@
   "prompt": "Slow motion, the camera slowly orbits around two sword fighters on a rocky mountain summit above a sea of clouds. A young swordsman in flowing white and azure ancient Chinese robes with long black hair and a young swordswoman in flowing crimson and white robes with long silk ribbons clash their glowing jian swords. At the moment the blades cross, sparks and swirls of blue and red energy burst outward, sleeves, hair and ribbons ripple slowly in the wind, petals and dust hang in the air. Chinese xianxia fantasy, high-quality 3D game cinematic, dramatic rim light at sunset, misty jagged peaks in the background, highly detailed, epic.",
   "negative": "色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走，文字，水印",
   "seeds": [
-    7,
-    2024
+    2024,
+    7
   ],
   "width": 1280,
   "height": 704,

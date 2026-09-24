@@ -1,0 +1,17 @@
+{
+  "id": "xianxia_flight_cont",
+  "note": "接在 xianxia_clash 後面（--chain）：從對劍的最後一格開始，兩人躍下山頂御劍飛走（原創古風仙俠角色，不使用任何既有作品 IP）",
+  "workflow": "wan22_5b_t2v.json",
+  "prompt": "Tracking shot, the camera pulls back and follows as the two sword fighters break apart, leap off the rocky summit and land on their flying glowing swords, then soar side by side over a sea of clouds at sunset. The swordsman in white and azure robes and the swordswoman in crimson robes stand on the blades, robes, hair and silk ribbons streaming in the wind, trails of blue and red light behind them. Chinese xianxia fantasy, high-quality 3D game cinematic, golden hour light, jagged misty peaks, highly detailed, epic.",
+  "negative": "色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走，文字，水印",
+  "seeds": [
+    2024,
+    7
+  ],
+  "width": 1280,
+  "height": 704,
+  "frames": 121,
+  "fps": 24,
+  "steps": 20,
+  "cfg": 5
+}
