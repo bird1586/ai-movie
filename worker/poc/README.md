@@ -23,11 +23,13 @@ vae/wan2.2_vae.safetensors                             1.41 GB
 ## 付費執行步驟（使用者確認後才做）
 
 > ⚠️ 下面是自帶映像的流程：2026-09-24 卡在拉映像 45 分鐘後失敗（NT$14.39）。
-> **改用下面這個已驗證的流程**（官方 ComfyUI 範本，NT$6.47 成功，細節見 `docs/PoC紀錄.md`）：
-> 1. vault 裡已經有 3 個模型 → `create-instance`，templateId 用 ComfyUI 範本（用 `list-templates` 查）
-> 2. RUNNING 後 `POST /instances/{id}/access-token {"port":8080}` 拿到網址，換成 cookie
-> 3. 本機跑：`COMFY_COOKIE=… RATE_NT_PER_H=<實際費率> python run_poc.py shots/opening_pan.json --comfy https://8080-<id>.gputw.ai --output-dir ../../data`
-> 4. 跑完立刻 stop
+> **改用已驗證的一鍵流程**（官方 ComfyUI 範本 + vault 模型，細節見 `docs/PoC紀錄.md`）：
+> ```sh
+> python gputw_session.py shots/xianxia_clash.json shots/xianxia_flight.json   # 會先報機器與費率，問 y/N
+> ```
+> 自動挑機 → 開機 → 拿 Web UI cookie → 本機跑 `run_poc.py`（多個鏡頭同一次開機）→ 影片下載到 `data/poc/` → 一定 stop。
+> 手動版：`create-instance`（ComfyUI 範本）→ `POST /instances/{id}/access-token {"port":8080}` 換 cookie →
+> `COMFY_COOKIE=… RATE_NT_PER_H=<實際費率> python run_poc.py shots/a.json shots/b.json --comfy https://8080-<id>.gputw.ai --output-dir ../../data` → stop。
 
 1. `validate-image`：`ghcr.io/bird1586/ai-movie-worker:<tag>`（免費，只確認拉得到）
 2. `download-model-to-vault`：上面 3 個檔（伺服器端下載，不開 GPU；/vault 依容量計費）

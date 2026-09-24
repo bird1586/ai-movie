@@ -43,14 +43,24 @@ PoC 實測紀錄與優化清單：`docs/PoC紀錄.md`（**動 GPU 之前先讀�
   白花 NT$14。**生影片一律用官方 `gputw/comfyui` 範本 + vault 模型**（第 2 次 PoC 成功，NT$6.47）。
   自帶映像留給官方範本做不到的事（CosyVoice、LatentSync），而且要縮到 1 GB 以下。
   部署時要設停損：拉映像超過 15 分鐘就 stop。
-- **遠端操作流程**（已驗證）：
-  - API key 在 `~/.config/gputw/key`（600）。使用方式：`curl -H "Authorization: Bearer $(< ~/.config/gputw/key)"`。
+- **標準做法：一個指令跑完一批鏡頭**（第 3 次 PoC 驗證過，全程無人介入）：
+  ```sh
+  cd worker/poc && python gputw_session.py shots/a.json shots/b.json --yes   # 使用者同意花費後才加 --yes
+  ```
+  挑最便宜的空機（4090 → 5090，≤ US$0.8/h）→ 官方範本 → 等 RUNNING（開機停損 900 s）→ 拿 cookie →
+  本機跑 `run_poc.py`（影片下載到 `data/poc/`）→ `finally` 一定 stop，扣款與秒數寫進 `data/poc/session-*.json`。
+  用 `run_in_background` 跑，不要自己 sleep 輪詢。**所有鏡頭排進同一次開機**，不要一個鏡頭開一次機。
+  - API key 在 `~/.config/gputw/key`（600），腳本自己讀。手動用只能這樣：`curl -H "Authorization: Bearer $(< ~/.config/gputw/key)"`。
     **絕對不要印出、echo 或 head 這個檔案**。Claude 外掛自己儲存的 key 不能讀（auto mode 會擋）。
-  - REST base 是 `https://api.gputw.ai/api`。`POST /instances/{id}/access-token {"port":8080}` 拿到 url，
-    用 `curl -c cookiejar -L "$url"` 換成 cookie，再把 cookie 放進 `COMFY_COOKIE` 給 `run_poc.py --comfy https://8080-<id>.gputw.ai`。
-  - 停機：`POST /instances/stop {"instanceId": …}`，或用 MCP `stop-instance`。
-- 實測（5090、720p、121 幀、20 步）：熱機 150 s／鏡頭，冷啟動多 90 s，VRAM 峰值 24 GB。
-  跑 `run_poc.py` 時用 `RATE_NT_PER_H` 設定實際費率。
+  - 手動步驟（腳本壞掉時）：REST base `https://api.gputw.ai/api`；`POST /instances/{id}/access-token {"port":8080}`
+    拿到的 url 90 秒內用 cookie jar 開一次換成 cookie → `COMFY_COOKIE` → `run_poc.py --comfy https://8080-<id>.gputw.ai`；
+    停機 `POST /instances/stop {"instanceId": …}`。
+- 實測（5090、720p、121 幀、20 步）：官方範本開機 **27 s**；熱機 **150–170 s／5 秒鏡頭**；
+  第一個鏡頭要從 vault 載入模型，**依節點差很多**（`72ca950b` +90 s、`b4d0f38c` +420 s）；VRAM 峰值 25 GB。
+  一次開機跑 N 個 5 秒鏡頭 ≈ 冷載入 + N × 170 s。
+- **提示詞（Wan2.2 5B）**：鏡頭運動要寫在**提示詞最前面**（"The camera pans…"、"Tracking shot…"、"Slow motion, the camera orbits…"），
+  寫在中間幾乎沒作用。負面提示詞**不要**放「镜头抖动」等鏡頭相關詞，會把整個運鏡壓掉（第 2 次 PoC 就是這樣變成靜態畫面）。
+  每個鏡頭給 2 個 seed，看聯絡表（contact sheet）挑一個。
 - 單價的 `hourlyRate` 是**美元**（0.5994 ≈ NT$18.9/h），帳戶餘額是新台幣（`get-vault-stats` 的 `balanceNtd`）。
 - `/vault` 每月 NT$2/GB。模型用 `download-model-to-vault`（`hf:owner/repo:path` 或 URL）在伺服器端下載，
   不用開 GPU。

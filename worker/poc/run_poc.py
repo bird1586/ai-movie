@@ -4,6 +4,7 @@
     python /opt/poc/run_poc.py /opt/poc/shots/opening_pan.json
 不花 GPU 也能先檢查工作流（ComfyUI 會做完整驗證，接著立刻取消）：
     python run_poc.py shots/opening_pan.json --dry-run
+可以一次給多個鏡頭，同一次開機依序跑完（只載入一次模型）。
 也可以在本機跑，對遠端 ComfyUI（例如 GPUtw 官方範本的 Web UI）送工作，影片用 /view 下載回來：
     COMFY_COOKIE='…' python run_poc.py shots/opening_pan.json --comfy https://8080-<id>.gputw.ai --output-dir ../../data
 
@@ -166,42 +167,15 @@ def probe(path: Path) -> dict:
         return {"error": str(e)}
 
 
-def main() -> None:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("shot", type=Path)
-    ap.add_argument("--comfy", default="http://127.0.0.1:8188")
-    ap.add_argument("--output-dir", type=Path, default=Path(os.environ.get("OUTPUT_DIR", "/vault/outputs")))
-    ap.add_argument("--dry-run", action="store_true", help="只驗證工作流與模型檔，送出後立刻取消")
-    ap.add_argument("--wait", type=float, default=600, help="等 ComfyUI 起來的秒數")
-    args = ap.parse_args()
-
-    shot = json.loads(args.shot.read_text())
-    uptime_at_start = container_uptime_s()
-    stats = wait_for_comfy(args.comfy, args.wait)
+def run_shot(args, shot: dict, stats: dict, client_id: str, cold_first: bool, uptime_at_start) -> None:
     dev = stats["devices"][0]
-    print(f"ComfyUI {stats['system'].get('comfyui_version')} · {dev['name']} · "
-          f"VRAM {dev['vram_total'] / 1e9:.1f} GB · 容器已開機 {container_uptime_s()} s")
-
-    client_id = uuid.uuid4().hex
-    first = build_prompt(shot, shot["seeds"][0])
-    missing = check_models(args.comfy, first)
-    if missing:
-        raise SystemExit("缺少模型檔（先下載到 /vault/models）：\n  " + "\n  ".join(missing))
-
-    if args.dry_run:
-        pid = call(args.comfy, "/prompt", {"prompt": first, "client_id": client_id})["prompt_id"]
-        call(args.comfy, "/queue", {"delete": [pid]})
-        call(args.comfy, "/interrupt", {})
-        print(f"✅ 工作流驗證通過（prompt {pid} 已取消）")
-        return
-
     runs = []
     for i, seed in enumerate(shot["seeds"]):
-        label = "冷啟動（含載入模型）" if i == 0 else "熱機"
-        print(f"▶ seed {seed}：{label} …", flush=True)
+        cold = cold_first and i == 0
+        print(f"▶ {shot['id']} seed {seed}：{'冷啟動（含載入模型）' if cold else '熱機'} …", flush=True)
         r = run_once(args.comfy, build_prompt(shot, seed), client_id)
         fetch_output(args.comfy, r.pop("output"), args.output_dir / r["file"])
-        r.update(seed=seed, cold=i == 0, video=probe(args.output_dir / r["file"]))
+        r.update(seed=seed, cold=cold, video=probe(args.output_dir / r["file"]))
         r["cost_nt"] = round(r["seconds"] / 3600 * RATE_NT_PER_H, 2)
         runs.append(r)
         print(f"  {r['seconds']} s · VRAM 峰值 {r['vram_peak_gb']} GB · NT${r['cost_nt']} · {r['file']}", flush=True)
@@ -220,14 +194,50 @@ def main() -> None:
             "output_seconds": round(out_s, 2),
             "warm_gpu_s_per_output_s": round(warm_s / out_s, 1),
             "warm_nt_per_output_s": round(warm_s / out_s / 3600 * RATE_NT_PER_H, 3),
-            "cold_extra_s": round(runs[0]["seconds"] - warm_s, 1) if len(runs) > 1 else None,
+            "cold_extra_s": round(runs[0]["seconds"] - warm_s, 1) if runs[0]["cold"] and len(runs) > 1 else None,
         },
     }
     dest = args.output_dir / "poc" / f"{shot['id']}-{time.strftime('%Y%m%d-%H%M%S')}.json"
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(json.dumps(report, ensure_ascii=False, indent=2))
     print(json.dumps(report["summary"], ensure_ascii=False))
-    print(f"報告：{dest}\n⚠️ 跑完記得 stop / delete 執行個體，閒置也在計費。")
+    print(f"報告：{dest}", flush=True)
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("shots", type=Path, nargs="+", help="一個或多個鏡頭規格；同一次開機依序跑完，只有第一個是冷啟動")
+    ap.add_argument("--comfy", default="http://127.0.0.1:8188")
+    ap.add_argument("--output-dir", type=Path, default=Path(os.environ.get("OUTPUT_DIR", "/vault/outputs")))
+    ap.add_argument("--dry-run", action="store_true", help="只驗證工作流與模型檔，送出後立刻取消")
+    ap.add_argument("--warm", action="store_true", help="模型已經載入過（同一次開機的第二批），不標冷啟動")
+    ap.add_argument("--wait", type=float, default=600, help="等 ComfyUI 起來的秒數")
+    args = ap.parse_args()
+
+    shots = [json.loads(p.read_text()) for p in args.shots]
+    uptime_at_start = container_uptime_s()
+    stats = wait_for_comfy(args.comfy, args.wait)
+    dev = stats["devices"][0]
+    print(f"ComfyUI {stats['system'].get('comfyui_version')} · {dev['name']} · "
+          f"VRAM {dev['vram_total'] / 1e9:.1f} GB · 容器已開機 {container_uptime_s()} s")
+
+    client_id = uuid.uuid4().hex
+    # 全部鏡頭先組好、先驗模型，GPU 開始算之前就擋掉規格錯誤
+    firsts = [build_prompt(shot, shot["seeds"][0]) for shot in shots]
+    missing = sorted({m for wf in firsts for m in check_models(args.comfy, wf)})
+    if missing:
+        raise SystemExit("缺少模型檔（先下載到 /vault/models）：\n  " + "\n  ".join(missing))
+
+    if args.dry_run:
+        pid = call(args.comfy, "/prompt", {"prompt": firsts[0], "client_id": client_id})["prompt_id"]
+        call(args.comfy, "/queue", {"delete": [pid]})
+        call(args.comfy, "/interrupt", {})
+        print(f"✅ 工作流驗證通過（{len(shots)} 個鏡頭；prompt {pid} 已取消）")
+        return
+
+    for i, shot in enumerate(shots):
+        run_shot(args, shot, stats, client_id, cold_first=i == 0 and not args.warm, uptime_at_start=uptime_at_start)
+    print("⚠️ 跑完記得 stop / delete 執行個體，閒置也在計費。")
 
 
 if __name__ == "__main__":

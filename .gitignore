@@ -20,3 +20,7 @@ frontend/dist/
 .idea/
 *.swp
 .DS_Store
+
+# GPUtw 外掛安裝時放進來的 agent 說明（本機工具檔，不進 repo）
+.gputw-skill/
+AGENTS.md

@@ -1,0 +1,16 @@
+{
+  "id": "opening_pan_v2",
+  "note": "第 2 次 PoC 的橫搖修正版：鏡頭動作放在提示詞最前面，負面提示詞拿掉「镜头抖动」",
+  "workflow": "wan22_5b_t2v.json",
+  "prompt": "The camera pans steadily from left to right, revealing a vast primordial valley at dawn. Wide establishing shot. As the view sweeps sideways, colossal ancient trees draped in vines pass through the frame, followed by towering cliffs with thin waterfalls and a winding river glinting with golden light. A flock of large colorful birds flies across the frame. Bright golden hour sunlight, vivid greens and teal, soft mist, epic scale, highly detailed, smooth continuous lateral camera movement, cinematic, anamorphic widescreen.",
+  "negative": "色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走，文字，水印",
+  "seeds": [
+    42
+  ],
+  "width": 1280,
+  "height": 704,
+  "frames": 121,
+  "fps": 24,
+  "steps": 20,
+  "cfg": 5
+}
