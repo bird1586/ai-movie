@@ -6,6 +6,7 @@ set -euo pipefail
 VAULT_MODELS=${VAULT_MODELS:-/vault/models}
 OUTPUT_DIR=${OUTPUT_DIR:-/vault/outputs}
 
+ssh-keygen -A  # 只補缺少的 host key；映像內不含任何私鑰
 /usr/sbin/sshd
 
 link() {  # link <來源> <目標>：目標已存在就換成連結

@@ -24,10 +24,12 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
+# 映像是公開的：apt 安裝時產生的 SSH host key 要刪掉，改由 entrypoint 每次開機重新產生
 # hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates git ffmpeg openssh-server sox libsndfile1 libgl1 libglib2.0-0 tini \
     && rm -rf /var/lib/apt/lists/* \
+    && rm -f /etc/ssh/ssh_host_* \
     && mkdir -p /run/sshd /root/.ssh && chmod 700 /root/.ssh \
     && sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin prohibit-password/; s/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
 
