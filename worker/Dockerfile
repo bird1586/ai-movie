@@ -66,16 +66,23 @@ RUN uv venv --python python3.11 --system-site-packages /opt/venv \
 
 # CosyVoice3：套件版本和 ComfyUI 衝突（numpy 1.26、transformers 4.51…），放獨立 venv。
 # 拿掉推論用不到的 deepspeed / tensorrt / gradio / web 伺服器，torch 用基底那份。
-RUN git clone --recurse-submodules --shallow-submodules https://github.com/FunAudioLLM/CosyVoice.git /opt/CosyVoice \
+# openai-whisper、pyworld 等只有 sdist，建置與執行時都要 pkg_resources（setuptools 81 起移除）；
+# pyworld 要 C++ 編譯器，裝完同一層就移除。
+# hadolint ignore=DL3008
+RUN apt-get update && apt-get install -y --no-install-recommends g++ \
+    && git clone --recurse-submodules --shallow-submodules https://github.com/FunAudioLLM/CosyVoice.git /opt/CosyVoice \
     && git -C /opt/CosyVoice checkout -q "$COSYVOICE_SHA" \
     && git -C /opt/CosyVoice submodule update --init --depth 1 \
     && find /opt/CosyVoice -name .git -prune -exec rm -rf {} + \
     && grep -vE '^(--|#|torch|torchaudio|deepspeed|tensorrt|gradio|fastapi|grpcio|onnxruntime-gpu)' \
         /opt/CosyVoice/requirements.txt > /tmp/cosy-req.txt \
-    && echo 'onnxruntime-gpu>=1.20' >> /tmp/cosy-req.txt \
+    && printf 'onnxruntime-gpu>=1.20\nsetuptools<81\n' >> /tmp/cosy-req.txt \
+    && echo 'setuptools<81' > /tmp/build-constraints.txt \
     && uv venv --python python3.11 --system-site-packages /opt/CosyVoice/.venv \
-    && uv pip install --python /opt/CosyVoice/.venv/bin/python -r /tmp/cosy-req.txt \
-    && rm /tmp/cosy-req.txt
+    && uv pip install --python /opt/CosyVoice/.venv/bin/python \
+        --build-constraints /tmp/build-constraints.txt -r /tmp/cosy-req.txt \
+    && apt-get purge -y --auto-remove g++ && rm -rf /var/lib/apt/lists/* \
+    && rm /tmp/cosy-req.txt /tmp/build-constraints.txt
 
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY models.manifest.yaml /opt/models.manifest.yaml
