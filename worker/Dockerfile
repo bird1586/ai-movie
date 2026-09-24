@@ -33,12 +33,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=ghcr.io/astral-sh/uv:0.11.7 /uv /bin/uv
 
-# torch 裝在基底直譯器，ComfyUI 與 CosyVoice 兩個 venv 用 --system-site-packages 共用，只存一份
+# torch 裝在基底直譯器，ComfyUI 與 CosyVoice 兩個 venv 用 --system-site-packages 共用，只存一份。
+# uv 不會把基底的套件當成已安裝，所以 venv 安裝時要用 --excludes 把 torch 排除，否則會各自再裝一份。
 RUN uv python install 3.11 \
     && ln -s "$(uv python find 3.11)" /usr/local/bin/python3.11 \
     && uv pip install --python python3.11 --system --break-system-packages \
         --index-url "$TORCH_INDEX" --extra-index-url https://pypi.org/simple \
-        torch==2.8.0 torchvision==0.23.0 torchaudio==2.8.0
+        torch==2.8.0 torchvision==0.23.0 torchaudio==2.8.0 \
+    && printf 'torch\ntorchvision\ntorchaudio\n' > /opt/torch-exclude.txt
 
 # ComfyUI + custom nodes（全部固定 commit）
 WORKDIR /opt
@@ -61,7 +63,7 @@ RUN uv venv --python python3.11 --system-site-packages /opt/venv \
         custom_nodes/ComfyUI-MMAudio/requirements.txt \
         custom_nodes/ComfyUI-LatentSyncWrapper/requirements.txt \
         > /tmp/comfy-req.txt \
-    && uv pip install --python /opt/venv/bin/python -r /tmp/comfy-req.txt \
+    && uv pip install --python /opt/venv/bin/python --excludes /opt/torch-exclude.txt -r /tmp/comfy-req.txt \
     && rm /tmp/comfy-req.txt
 
 # CosyVoice3：套件版本和 ComfyUI 衝突（numpy 1.26、transformers 4.51…），放獨立 venv。
@@ -79,10 +81,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends g++ \
     && printf 'onnxruntime-gpu>=1.20\nsetuptools<81\n' >> /tmp/cosy-req.txt \
     && echo 'setuptools<81' > /tmp/build-constraints.txt \
     && uv venv --python python3.11 --system-site-packages /opt/CosyVoice/.venv \
-    && uv pip install --python /opt/CosyVoice/.venv/bin/python \
+    && uv pip install --python /opt/CosyVoice/.venv/bin/python --excludes /opt/torch-exclude.txt \
         --build-constraints /tmp/build-constraints.txt -r /tmp/cosy-req.txt \
     && apt-get purge -y --auto-remove g++ && rm -rf /var/lib/apt/lists/* \
     && rm /tmp/cosy-req.txt /tmp/build-constraints.txt
+
+# 兩個 venv 都必須用到基底那份 torch，不然映像會多出好幾 GB
+RUN for py in /opt/venv/bin/python /opt/CosyVoice/.venv/bin/python; do \
+        "$py" -c "import sys, torch; assert torch.__file__.startswith('/opt/python'), torch.__file__; \
+assert torch.__version__.startswith('2.8.0'), torch.__version__; print(sys.executable, torch.__version__)"; \
+    done
 
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY models.manifest.yaml /opt/models.manifest.yaml
