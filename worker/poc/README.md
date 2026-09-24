@@ -22,8 +22,12 @@ vae/wan2.2_vae.safetensors                             1.41 GB
 
 ## 付費執行步驟（使用者確認後才做）
 
-> ⚠️ 2026-09-24 照下面的步驟跑，卡在拉映像 45 分鐘後失敗（NT$14.39，沒有產出）。
-> 下次改用官方 ComfyUI 範本，見 `docs/PoC紀錄.md`「教訓與優化」。
+> ⚠️ 下面是自帶映像的流程：2026-09-24 卡在拉映像 45 分鐘後失敗（NT$14.39）。
+> **改用下面這個已驗證的流程**（官方 ComfyUI 範本，NT$6.47 成功，細節見 `docs/PoC紀錄.md`）：
+> 1. vault 裡已經有 3 個模型 → `create-instance`，templateId 用 ComfyUI 範本（用 `list-templates` 查）
+> 2. RUNNING 後 `POST /instances/{id}/access-token {"port":8080}` 拿到網址，換成 cookie
+> 3. 本機跑：`COMFY_COOKIE=… RATE_NT_PER_H=<實際費率> python run_poc.py shots/opening_pan.json --comfy https://8080-<id>.gputw.ai --output-dir ../../data`
+> 4. 跑完立刻 stop
 
 1. `validate-image`：`ghcr.io/bird1586/ai-movie-worker:<tag>`（免費，只確認拉得到）
 2. `download-model-to-vault`：上面 3 個檔（伺服器端下載，不開 GPU；/vault 依容量計費）

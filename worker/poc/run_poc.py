@@ -4,6 +4,8 @@
     python /opt/poc/run_poc.py /opt/poc/shots/opening_pan.json
 不花 GPU 也能先檢查工作流（ComfyUI 會做完整驗證，接著立刻取消）：
     python run_poc.py shots/opening_pan.json --dry-run
+也可以在本機跑，對遠端 ComfyUI（例如 GPUtw 官方範本的 Web UI）送工作，影片用 /view 下載回來：
+    COMFY_COOKIE='…' python run_poc.py shots/opening_pan.json --comfy https://8080-<id>.gputw.ai --output-dir ../../data
 
 每個 seed 生成一次；第一次含模型載入（冷啟動），之後是熱機時間，兩者分開記錄。
 結果寫到 <輸出目錄>/poc/<shot id>-<時間>.json，影片在同一個目錄。
@@ -18,19 +20,22 @@ import threading
 import time
 import urllib.error
 import urllib.request
+import urllib.parse
 import uuid
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-RATE_NT_PER_H = 16.18  # RTX 4090，與 backend/app/budget.py 相同
+RATE_NT_PER_H = float(os.environ.get("RATE_NT_PER_H", 16.18))  # 預設 RTX 4090，與 backend/app/budget.py 相同
 SAVE_NODE = "58"
+# 遠端 ComfyUI 在 GPUtw 的私有 HTTP 埠後面，要帶 access-token 換來的 cookie
+HEADERS = {"User-Agent": "ai-movie-poc/1.0"} | ({"Cookie": os.environ["COMFY_COOKIE"]} if os.environ.get("COMFY_COOKIE") else {})
 
 
 def call(base: str, path: str, body: dict | None = None) -> dict:
     req = urllib.request.Request(
         base + path,
         data=json.dumps(body).encode() if body is not None else None,
-        headers={"Content-Type": "application/json"},
+        headers={"Content-Type": "application/json", **HEADERS},
     )
     try:
         with urllib.request.urlopen(req, timeout=30) as r:
@@ -132,7 +137,20 @@ def run_once(base: str, wf: dict, client_id: str) -> dict:
         "seconds": round(elapsed, 1),
         "vram_peak_gb": round(sampler.peak_gb, 2),
         "file": str(Path(out.get("subfolder", "")) / out["filename"]),
+        "output": out,
     }
+
+
+def fetch_output(base: str, out: dict, dest: Path) -> None:
+    """本機沒有這個檔案（ComfyUI 在遠端）就從 /view 下載。"""
+    if dest.exists():
+        return
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    query = urllib.parse.urlencode({"filename": out["filename"], "subfolder": out.get("subfolder", ""), "type": "output"})
+    req = urllib.request.Request(f"{base}/view?{query}", headers=HEADERS)
+    with urllib.request.urlopen(req, timeout=300) as r, open(dest, "wb") as f:
+        while chunk := r.read(1 << 20):
+            f.write(chunk)
 
 
 def probe(path: Path) -> dict:
@@ -182,6 +200,7 @@ def main() -> None:
         label = "冷啟動（含載入模型）" if i == 0 else "熱機"
         print(f"▶ seed {seed}：{label} …", flush=True)
         r = run_once(args.comfy, build_prompt(shot, seed), client_id)
+        fetch_output(args.comfy, r.pop("output"), args.output_dir / r["file"])
         r.update(seed=seed, cold=i == 0, video=probe(args.output_dir / r["file"]))
         r["cost_nt"] = round(r["seconds"] / 3600 * RATE_NT_PER_H, 2)
         runs.append(r)

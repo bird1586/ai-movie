@@ -40,14 +40,21 @@ PoC 實測紀錄與優化清單：`docs/PoC紀錄.md`（**動 GPU 之前先讀�
 - 帳戶餘額不多（2026-09 約 NT$100）。4090 常常售完，5090 32GB 約 $0.60/h 起。
 - 計費從**拉映像**就開始算；閒置照樣計費。跑完**立刻 stop**（stop 會保留 /workspace，delete 前要先確認）。
 - **GPU 節點拉自帶映像非常慢**：第 1 次 PoC 拉 6.2 GB 映像，45 分鐘沒拉完就被平台標 FAILED，
-  白花 NT$14。下次優先用官方 `gputw/comfyui` 範本加 vault 模型；自帶映像要縮到 1 GB 以下。
+  白花 NT$14。**生影片一律用官方 `gputw/comfyui` 範本 + vault 模型**（第 2 次 PoC 成功，NT$6.47）。
+  自帶映像留給官方範本做不到的事（CosyVoice、LatentSync），而且要縮到 1 GB 以下。
   部署時要設停損：拉映像超過 15 分鐘就 stop。
+- **遠端操作流程**（已驗證）：
+  - API key 在 `~/.config/gputw/key`（600）。使用方式：`curl -H "Authorization: Bearer $(< ~/.config/gputw/key)"`。
+    **絕對不要印出、echo 或 head 這個檔案**。Claude 外掛自己儲存的 key 不能讀（auto mode 會擋）。
+  - REST base 是 `https://api.gputw.ai/api`。`POST /instances/{id}/access-token {"port":8080}` 拿到 url，
+    用 `curl -c cookiejar -L "$url"` 換成 cookie，再把 cookie 放進 `COMFY_COOKIE` 給 `run_poc.py --comfy https://8080-<id>.gputw.ai`。
+  - 停機：`POST /instances/stop {"instanceId": …}`，或用 MCP `stop-instance`。
+- 實測（5090、720p、121 幀、20 步）：熱機 150 s／鏡頭，冷啟動多 90 s，VRAM 峰值 24 GB。
+  跑 `run_poc.py` 時用 `RATE_NT_PER_H` 設定實際費率。
 - 單價的 `hourlyRate` 是**美元**（0.5994 ≈ NT$18.9/h），帳戶餘額是新台幣（`get-vault-stats` 的 `balanceNtd`）。
 - `/vault` 每月 NT$2/GB。模型用 `download-model-to-vault`（`hf:owner/repo:path` 或 URL）在伺服器端下載，
   不用開 GPU。
-- 輸出影片寫到 `/workspace`（`OUTPUT_DIR=/workspace/outputs`），不要寫到 `/vault`。
-  執行個體還在跑的時候，透過 ComfyUI Web UI 的 `/view?filename=…&subfolder=…&type=output` 下載回本機。
-  MCP 沒有 vault 下載工具，vault REST API 要用 `GPUTW_API_KEY`，但這個 key 不在環境變數裡。
+- 影片不要放在 `/vault`：`run_poc.py` 會在執行個體還開著時，透過 ComfyUI 的 `/view` 把影片下載到本機 `data/poc/`。
 - PoC 步驟與實測時間、費用：`worker/poc/README.md`、`docs/PoC紀錄.md`。
 
 ## 公開 repo 規則
