@@ -1,0 +1,52 @@
+# PoC 紀錄
+
+每次付費執行後補一節：實際花了什麼、卡在哪、下次怎麼改。規劃與步驟見 `worker/poc/README.md`。
+
+## 2026-09-24 第 1 次：5 秒片頭（Wan2.2 TI2V-5B）— 失敗，卡在拉映像
+
+**結果：沒有產出影片。** 執行個體在 PULLING_IMAGE 卡了 45.8 分鐘，之後平台把它標成 FAILED，
+沒有給失敗原因，log API 回 500。隨即 stop，確認 0 台 RUNNING。
+
+| 項目 | 值 |
+|---|---|
+| 映像 | `ghcr.io/bird1586/ai-movie-worker:fef3cf688df7`（壓縮後 6.16 GB，19 層，最大一層 4.01 GB） |
+| 機器 | RTX 5090 32GB，節點 `b4d0f38c`，US$0.5994/h（約 NT$18.9/h），頻寬 100 Mbps（內含的方案） |
+| 參數 | `args: ["poc"]`、`OUTPUT_DIR=/workspace/outputs`、Web UI 8188、sshEnabled |
+| 時間軸 (UTC) | 01:21 開始下載模型到 vault → 01:26 完成 → 01:27:17 建立執行個體 → 02:13 FAILED → stop |
+| 花費 | 餘額 NT$100 → **NT$85.61（花了 NT$14.39）**，幾乎都是拉映像的 GPU 計費 |
+| /vault | 3 個模型 16.9 GB，已就位，**保留**（每月約 NT$34）；下次直接用 |
+
+### 經過
+
+1. `download-model-to-vault` 伺服器端下載 3 個模型（HF → vault）：**10 GB 約 5 分鐘（約 33 MB/s）**，不開 GPU，這一步很順。
+2. RTX 4090 售完，改用 5090 裡最便宜的節點。
+3. 事件只有 `Scheduled` → `Pulling image`，45 分鐘都沒有任何 Failed 或 BackOff 事件，也看不到下載進度。
+4. 從本機（Oracle）抓 GHCR 同一層實測約 13 MB/s，整個映像約 8 分鐘可以抓完；
+   GPU 節點 45 分鐘還沒拉完，有效速度 < 2.3 MB/s。所以瓶頸在**節點到 GHCR 的線路**（或解壓），不是映像壞掉。
+5. 平台大約在 45 分鐘時放棄（推測有部署逾時），狀態變 FAILED，但沒有 failureReason。
+
+### 教訓與優化（依優先順序）
+
+1. **不要讓 GPU 機器去拉大型自帶映像。** 拉映像的時間全部按 GPU 單價計費，而且速度無法預測。
+   vault 的伺服器端下載快又不計 GPU 費用，應該把「大東西」都走 vault。
+2. **下次改用 GPUtw 官方 ComfyUI 範本**（`gputw/comfyui`，templateId 用 `list-templates` 查，不要寫死）。
+   官方範本很可能已經快取在節點上，開機不用拉映像。
+   - 要先確認：範本的 ComfyUI 版本有沒有 `Wan22ImageToVideoLatent` 節點（v0.3.46 以後才有），
+     以及模型路徑怎麼對到 `/vault/models`（`extra_model_paths.yaml` 或 symlink）。
+   - Web UI 是 8080。`run_poc.py` 可以在**本機**跑，用 `--comfy https://<web UI 網址>` 直接呼叫 API，
+     容器裡不用放任何東西。影片也用 `/view` 從同一個網址下載回本機。
+   - 注意：`run_poc.py` 的 `probe` 會用 `--output-dir` 找檔案，本機跑時要改成下載後再 probe。
+3. 如果還是要用自帶映像（之後需要 CosyVoice、LatentSync 時）：
+   - 映像只放系統套件和程式碼（目標 < 1 GB），torch 和兩個 venv 打包成 tar 放 vault，
+     開機時直接從 vault 用（或解壓到 /workspace）。
+   - 把 4 GB 的單一層拆成多層，讓下載可以平行。
+   - 先開一次、拉完映像後就一直用**同一個節點**（映像會快取在節點上）。這次沒拉完，快取狀況不明。
+4. **設停損時間。** 部署時就定好上限（例如拉映像 15 分鐘沒進 STARTING 就 stop），不要一路等到平台逾時。
+   這次多等的 30 分鐘約 NT$9.5。
+5. 開機前先確認帳戶的 SSH 金鑰已經加到 GPUtw console。這次也不確定，所以輸出改寫到 `/workspace`，
+   打算用 Web UI 的 `/view` 下載。
+6. `run_poc.py` 的 `RATE_NT_PER_H` 寫死成 4090 的費率。改用其他卡時，報告裡的費用要自己換算。
+
+### 下次 PoC 預估（改用官方範本）
+
+開機約 1–3 分鐘，加上模型載入和兩個 seed 各約 5 分鐘（5090），總共約 15 分鐘 ≈ **NT$5**。

@@ -22,6 +22,9 @@ vae/wan2.2_vae.safetensors                             1.41 GB
 
 ## 付費執行步驟（使用者確認後才做）
 
+> ⚠️ 2026-09-24 照下面的步驟跑，卡在拉映像 45 分鐘後失敗（NT$14.39，沒有產出）。
+> 下次改用官方 ComfyUI 範本，見 `docs/PoC紀錄.md`「教訓與優化」。
+
 1. `validate-image`：`ghcr.io/bird1586/ai-movie-worker:<tag>`（免費，只確認拉得到）
 2. `download-model-to-vault`：上面 3 個檔（伺服器端下載，不開 GPU；/vault 依容量計費）
 3. `create-instance`：RTX 4090 單卡，`customImage.dockerImage` 用上面的 tag，
