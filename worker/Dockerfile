@@ -96,6 +96,7 @@ assert torch.__version__.startswith('2.8.0'), torch.__version__; print(sys.execu
 
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY models.manifest.yaml /opt/models.manifest.yaml
+COPY poc /opt/poc
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 ENV PATH=/opt/venv/bin:$PATH

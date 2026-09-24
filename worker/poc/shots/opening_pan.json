@@ -1,0 +1,14 @@
+{
+  "id": "opening_pan",
+  "note": "片頭：緩慢橫搖展示原始大地與叢林飛鳥（原創世界觀，不使用任何既有電影 IP）",
+  "workflow": "wan22_5b_t2v.json",
+  "prompt": "Cinematic opening shot of an untouched primordial world at dawn. The camera slowly pans from left to right across a vast valley of colossal ancient trees wrapped in hanging vines and moss, towering stone cliffs with thin waterfalls falling into mist, and a winding river glinting with golden sunlight. A flock of large colorful birds glides through the jungle canopy toward the horizon. Soft volumetric light rays through the mist, rich green and teal tones, epic scale, highly detailed, smooth steady camera movement, film grain, anamorphic widescreen.",
+  "negative": "色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走，文字，水印，镜头抖动",
+  "seeds": [42, 1234],
+  "width": 1280,
+  "height": 704,
+  "frames": 121,
+  "fps": 24,
+  "steps": 20,
+  "cfg": 5
+}

@@ -35,6 +35,13 @@ case "${1:-comfyui}" in
         shift || true
         exec python "$COMFY/main.py" --listen 0.0.0.0 --port 8188 --output-directory "${OUTPUT_DIR}" "$@"
         ;;
+    poc)  # 開 ComfyUI 並自動跑一個鏡頭規格，跑完 ComfyUI 繼續開著（可從 Web UI 看結果）
+        shot=${2:-/opt/poc/shots/opening_pan.json}
+        python "$COMFY/main.py" --listen 0.0.0.0 --port 8188 --output-directory "${OUTPUT_DIR}" &
+        comfy_pid=$!
+        python /opt/poc/run_poc.py "$shot" --output-dir "$OUTPUT_DIR" 2>&1 | tee "$OUTPUT_DIR/poc-last.log" || true
+        wait "$comfy_pid"
+        ;;
     idle)  # 只開 SSH，例如下載模型或除錯時
         exec sleep infinity
         ;;
